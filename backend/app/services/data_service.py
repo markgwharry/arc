@@ -1,5 +1,5 @@
 import httpx
-from typing import Optional
+from typing import Optional, List, Set
 from cachetools import TTLCache
 from ..core.config import get_settings
 from ..models.items import Item, ItemStats, CraftingRecipe, RecycleYield
@@ -22,14 +22,14 @@ class ArcDataService:
 
     def __init__(self):
         self.client = httpx.AsyncClient(timeout=30.0)
-        self._all_items: list[Item] = []
-        self._categories: set[str] = set()
-        self._rarities: set[str] = set()
+        self._all_items: List[Item] = []
+        self._categories: Set[str] = set()
+        self._rarities: Set[str] = set()
 
     async def close(self):
         await self.client.aclose()
 
-    async def fetch_items_from_metaforge(self) -> list[dict]:
+    async def fetch_items_from_metaforge(self) -> List[dict]:
         """Fetch items from MetaForge API."""
         try:
             response = await self.client.get(
@@ -43,7 +43,7 @@ class ArcDataService:
             print(f"MetaForge API error: {e}")
             return []
 
-    async def fetch_items_from_ardb(self) -> list[dict]:
+    async def fetch_items_from_ardb(self) -> List[dict]:
         """Fetch items from ARDB API (backup source)."""
         try:
             response = await self.client.get(f"{settings.ardb_api_url}/items")
@@ -95,7 +95,7 @@ class ArcDataService:
             image_url=raw.get("image") or raw.get("icon")
         )
 
-    async def get_all_items(self, force_refresh: bool = False) -> list[Item]:
+    async def get_all_items(self, force_refresh: bool = False) -> List[Item]:
         """Get all items, using cache when available."""
         cache_key = "all_items"
 
@@ -114,7 +114,9 @@ class ArcDataService:
             # Return cached items if available, even if expired
             return self._all_items if self._all_items else []
 
-        items = [self._normalize_item(raw, source) for raw in raw_items]
+        # Filter to only include valid dict items
+        valid_items = [raw for raw in raw_items if isinstance(raw, dict)]
+        items = [self._normalize_item(raw, source) for raw in valid_items]
 
         # Update cache and metadata
         self._all_items = items
@@ -135,7 +137,7 @@ class ArcDataService:
         max_value: Optional[int] = None,
         limit: int = 50,
         offset: int = 0
-    ) -> tuple[list[Item], int]:
+    ) -> tuple:
         """Search and filter items."""
         items = await self.get_all_items()
 
@@ -181,17 +183,17 @@ class ArcDataService:
                 return item
         return None
 
-    async def get_categories(self) -> list[str]:
+    async def get_categories(self) -> List[str]:
         """Get all available categories."""
         await self.get_all_items()
         return sorted(list(self._categories))
 
-    async def get_rarities(self) -> list[str]:
+    async def get_rarities(self) -> List[str]:
         """Get all available rarities."""
         await self.get_all_items()
         return sorted(list(self._rarities))
 
-    async def fetch_events(self) -> list[dict]:
+    async def fetch_events(self) -> List[dict]:
         """Fetch current events and timers."""
         cache_key = "events"
         if cache_key in _events_cache:
@@ -207,7 +209,7 @@ class ArcDataService:
             print(f"Events API error: {e}")
             return []
 
-    async def fetch_traders(self) -> list[dict]:
+    async def fetch_traders(self) -> List[dict]:
         """Fetch trader information."""
         cache_key = "traders"
         if cache_key in _traders_cache:
@@ -225,7 +227,7 @@ class ArcDataService:
 
     # ===== QUESTS =====
 
-    async def fetch_quests_from_metaforge(self) -> list[dict]:
+    async def fetch_quests_from_metaforge(self) -> List[dict]:
         """Fetch quests from MetaForge API."""
         try:
             response = await self.client.get(
@@ -278,7 +280,7 @@ class ArcDataService:
             image_url=raw.get("image") or raw.get("icon")
         )
 
-    async def get_all_quests(self, force_refresh: bool = False) -> list[Quest]:
+    async def get_all_quests(self, force_refresh: bool = False) -> List[Quest]:
         """Get all quests."""
         cache_key = "all_quests"
 
@@ -290,7 +292,9 @@ class ArcDataService:
         if not raw_quests:
             return []
 
-        quests = [self._normalize_quest(raw) for raw in raw_quests]
+        # Filter to only include valid dict items
+        valid_quests = [raw for raw in raw_quests if isinstance(raw, dict)]
+        quests = [self._normalize_quest(raw) for raw in valid_quests]
         _quests_cache[cache_key] = quests
         return quests
 
@@ -302,7 +306,7 @@ class ArcDataService:
         location: Optional[str] = None,
         limit: int = 50,
         offset: int = 0
-    ) -> tuple[list[Quest], int]:
+    ) -> tuple:
         """Search and filter quests."""
         quests = await self.get_all_quests()
         filtered = quests
@@ -336,7 +340,7 @@ class ArcDataService:
                 return quest
         return None
 
-    async def get_quest_givers(self) -> list[str]:
+    async def get_quest_givers(self) -> List[str]:
         """Get all quest givers."""
         quests = await self.get_all_quests()
         givers = {q.giver for q in quests if q.giver}
@@ -344,7 +348,7 @@ class ArcDataService:
 
     # ===== MAPS =====
 
-    async def fetch_maps_from_metaforge(self) -> list[dict]:
+    async def fetch_maps_from_metaforge(self) -> List[dict]:
         """Fetch maps from MetaForge API."""
         try:
             response = await self.client.get(f"{settings.metaforge_api_url}/maps")
@@ -408,7 +412,7 @@ class ArcDataService:
             extractions=extractions
         )
 
-    async def get_all_maps(self, force_refresh: bool = False) -> list[GameMap]:
+    async def get_all_maps(self, force_refresh: bool = False) -> List[GameMap]:
         """Get all maps."""
         cache_key = "all_maps"
 
@@ -420,7 +424,9 @@ class ArcDataService:
         if not raw_maps:
             return []
 
-        maps = [self._normalize_map(raw) for raw in raw_maps]
+        # Filter to only include valid dict items
+        valid_maps = [raw for raw in raw_maps if isinstance(raw, dict)]
+        maps = [self._normalize_map(raw) for raw in valid_maps]
         _maps_cache[cache_key] = maps
         return maps
 
@@ -434,7 +440,7 @@ class ArcDataService:
 
     # ===== WEAPONS & LOADOUTS =====
 
-    async def get_weapons(self) -> list[Weapon]:
+    async def get_weapons(self) -> List[Weapon]:
         """Get all weapons from items database."""
         items = await self.get_all_items()
         weapons = []
@@ -463,7 +469,7 @@ class ArcDataService:
 
         return weapons
 
-    async def get_armor(self) -> list[ArmorPiece]:
+    async def get_armor(self) -> List[ArmorPiece]:
         """Get all armor from items database."""
         items = await self.get_all_items()
         armor_list = []

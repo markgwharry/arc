@@ -1,3 +1,4 @@
+from typing import Optional
 from pydantic_settings import BaseSettings
 from functools import lru_cache
 
@@ -18,7 +19,7 @@ class Settings(BaseSettings):
     cache_ttl_traders: int = 600  # 10 minutes
 
     # Redis (optional, falls back to in-memory cache)
-    redis_url: str | None = None
+    redis_url: Optional[str] = None
 
     class Config:
         env_file = ".env"
