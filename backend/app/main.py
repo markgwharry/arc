@@ -2,7 +2,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from .core.config import get_settings
-from .api import items, events
+from .api import items, events, quests, maps, loadouts
 from .services.data_service import data_service
 
 settings = get_settings()
@@ -10,9 +10,11 @@ settings = get_settings()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup: pre-load items cache
+    # Startup: pre-load caches
     print("Loading Arc Raiders data...")
     await data_service.get_all_items()
+    await data_service.get_all_quests()
+    await data_service.get_all_maps()
     print("Data loaded successfully!")
     yield
     # Shutdown: cleanup
@@ -27,6 +29,9 @@ app = FastAPI(
 
     ## Features
     - **Item Database**: Search and browse 491+ items with stats, crafting recipes, and recycling yields
+    - **Quest Guide**: Complete quest database with objectives, requirements, and rewards
+    - **Interactive Maps**: All 5 maps with markers, extractions, and loot locations
+    - **Loadout Builder**: Weapon stats, DPS calculations, and tier lists
     - **Events**: Current storms, merchant visits, and special events
     - **Traders**: Trader inventory and rotation schedules
 
@@ -58,6 +63,9 @@ app.add_middleware(
 # Register routers
 app.include_router(items.router, prefix="/api")
 app.include_router(events.router, prefix="/api")
+app.include_router(quests.router, prefix="/api")
+app.include_router(maps.router, prefix="/api")
+app.include_router(loadouts.router, prefix="/api")
 
 
 @app.get("/")
@@ -81,9 +89,15 @@ async def get_stats():
     items_list = await data_service.get_all_items()
     categories = await data_service.get_categories()
     rarities = await data_service.get_rarities()
+    quests_list = await data_service.get_all_quests()
+    maps_list = await data_service.get_all_maps()
+    weapons = await data_service.get_weapons()
 
     return {
         "total_items": len(items_list),
+        "total_quests": len(quests_list),
+        "total_maps": len(maps_list),
+        "total_weapons": len(weapons),
         "categories": len(categories),
         "rarities": len(rarities),
         "data_sources": ["MetaForge", "ARDB", "RaidTheory"]
